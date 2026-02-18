@@ -1,54 +1,24 @@
 # Draper House Storefront – Development Log
 
-##  Feb 14 – Project Foundation Complete
+##  Feb 14 — Backend Foundation + Admin-Ready API Completed
+Project Setup
 
-Today I initialized the real application environment.
+Created Next.js 16 app (App Router, TypeScript)
 
-Completed:
-- Created Next.js application
-- Designed PostgreSQL schema for:
-  - products
-  - product_images
-  - orders
-  - order_items
-  - processed_stripe_events (webhook idempotency)
-- Installed and configured PostgreSQL locally
-- Connected app to database via DATABASE_URL
-- Built health check API route (/api/health/db)
-- Verified DB connection works
-- Added Git tracking and first commit
-- Renamed project to "draper-house-storefront"
+Configured local PostgreSQL
 
-Current status:
-The app backend and database layer are fully operational.
-The system can now safely support product creation and checkout logic.
+Connected app via DATABASE_URL
 
-Next step:
-Implement product API and admin inventory upload.
+Implemented DB health endpoint:
+GET /api/health/db
 
-## Feb 14 – Backend Foundation + API Layer Complete
+Initialized Git repository and pushed to origin/main
 
-Today the application moved from project initialization to a functioning backend service.
+# Database Architecture
 
-Environment Setup
+Implemented production-safe schema:
 
-Created Next.js 16 application (App Router, TypeScript)
-
-Installed and configured PostgreSQL locally
-
-Connected app to database via DATABASE_URL
-
-Built and verified database health endpoint: /api/health/db
-
-Initialized Git repository
-
-Renamed project to draper-house-storefront
-
-Database Architecture
-
-Designed and implemented production-safe schema:
-
-Tables:
+Tables
 
 products (single-quantity inventory model)
 
@@ -58,81 +28,139 @@ orders
 
 order_items
 
-processed_stripe_events (webhook idempotency ledger)
+processed_stripe_events (Stripe webhook idempotency ledger)
 
-Key characteristics:
+# Core Design Decisions
 
-Price stored as price_cents (integer)
+price_cents stored as integer (no floating point risk)
 
-Inventory stored as constrained quantity (0 or 1)
+Inventory constrained at DB level (quantity 0 or 1)
 
-Slug generation for product URLs
+Slug auto-generated for product URLs
 
-Referential integrity enforced via foreign keys
+Foreign keys enforced
 
-Oversell prevention handled at DB layer
+Oversell protection handled at DB layer
 
-API Layer Implemented
+Deterministic image ordering
 
-Built modular API structure using repository + validation layers.
+# API Layer
 
-Implemented Routes
+Modular architecture:
+
+Raw SQL repositories
+
+Dedicated validation layer
+
+No ORM
+
+Clean route structure
+
+Public Routes
 
 GET /api/products
+Returns active products + primary image
+
+GET /api/products/[id]
+Returns product + ordered images
+
+Admin Routes (Bearer Protected)
 
 POST /api/products
 
-GET /api/products/[id]
-
 POST /api/products/[id]/images
 
-All queries use raw SQL (no ORM).
-Validation layer enforces payload structure.
-Price conversion (string → cents) handled server-side.
-Slug auto-generated.
-Inventory logic confirmed working.
+# Admin Write Protection
 
-Dev Environment Stabilized
+Implemented requireAdmin() helper
 
-Encountered Turbopack persistence corruption (SST write errors).
+Requires:
+Authorization: Bearer <ADMIN_TOKEN>
 
-Resolution:
+401 without token
 
-Cleared .next, .turbo, and cache directories
+201 with valid token
 
-Disabled Turbopack in dev via:
+Token stored only in .env.local
+
+Token never exposed to browser
+
+# Dev Stability
+
+Encountered Turbopack persistence corruption (SST write errors)
+
+Resolved by disabling Turbopack in dev:
 
 "dev": "NEXT_DISABLE_TURBOPACK=1 next dev"
 
 
-Result:
+Dev environment stabilized.
 
-Stable dev runtime
+# Verified Working
 
-No cache corruption
+Product creation flow (201 → visible in GET)
 
-Clean API responses
+Image attach flow (imageUrl payload)
 
-Confirmed 201 insert + immediate 200 list consistency
+Auth gating (401 / 201 behavior confirmed)
 
-Verified Functional Flow
+Slug generation
 
-Tested full product lifecycle:
+Price → cents conversion
 
-POST product → 201 Created
+Active product rendering
 
-Product stored with:
+## Feb 15 — Admin UI + Secure Server Token Handling
+Admin Interface
 
-priceCents
+Implemented /admin page
 
-inventoryQuantity
+Server action submits product form
 
-status: ACTIVE
+Server action reads process.env.ADMIN_TOKEN
 
-GET products → returns inserted rows
+Server action calls /api/admin/products
 
-Slug generation validated
+Response JSON displayed on page
 
-Multiple products confirmed listing correctly
+Active product list refreshes after creation
 
-Backend is now fully operational.
+# Security Model Confirmed
+
+No bearer token in browser
+
+All token usage is server-side only
+
+API remains modular (validation → repository → route)
+
+No ORM introduced
+
+No repository refactor performed
+
+🚧 Next Phase
+
+Implement login screen + cookie session for /admin
+
+Add DRAFT status for staged inventory
+
+Design mobile-first homepage experience
+
+Add PWA support (installable web app)
+
+Prepare Vercel + hosted Postgres deployment
+
+## Feb 17 — Product Pivot: Storefront → Inventory Capture (Mobile-First)
+
+Shifted project approach to phased delivery based on Mom’s real workflow.
+
+Phase 1 MVP is now a mobile-first inventory capture web app (PWA-style) for iPhone use:
+
+Login + private access
+
+Add item with photos + required listing fields
+
+Inventory list with Draft/Ready/Listed/Sold statuses
+
+Generate “listing package” (copy/paste text + export photos) for Etsy/marketplaces
+
+Payments/checkout/storefront moved to Phase 3 once inventory workflow is stable.

@@ -3,24 +3,48 @@
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
   slug TEXT NOT NULL UNIQUE,
+  sku TEXT UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
+  category TEXT,
+  condition_note TEXT,
+  dimensions TEXT,
+  weight_lbs NUMERIC,
   price_cents INTEGER NOT NULL CHECK (price_cents >= 0),
+  suggested_price_low_cents INTEGER,
+  suggested_price_high_cents INTEGER,
   currency CHAR(3) NOT NULL DEFAULT 'USD',
   inventory_quantity SMALLINT NOT NULL DEFAULT 1 CHECK (inventory_quantity IN (0, 1)),
-  status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'SOLD')),
+  status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'ACTIVE', 'SOLD')),
+  published_at TIMESTAMPTZ,
   sold_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT products_inventory_status_consistent CHECK (
-    (status = 'ACTIVE' AND inventory_quantity = 1 AND sold_at IS NULL)
+    (status = 'DRAFT' AND inventory_quantity = 1 AND published_at IS NULL AND sold_at IS NULL)
+    OR
+    (status = 'ACTIVE' AND inventory_quantity = 1 AND published_at IS NOT NULL AND sold_at IS NULL)
     OR
     (status = 'SOLD' AND inventory_quantity = 0 AND sold_at IS NOT NULL)
-  )
+  ),
+  CONSTRAINT products_weight_lbs_nonnegative
+    CHECK (weight_lbs IS NULL OR weight_lbs >= 0),
+  CONSTRAINT products_suggested_price_low_nonnegative
+    CHECK (suggested_price_low_cents IS NULL OR suggested_price_low_cents >= 0),
+  CONSTRAINT products_suggested_price_high_nonnegative
+    CHECK (suggested_price_high_cents IS NULL OR suggested_price_high_cents >= 0),
+  CONSTRAINT products_suggested_price_range_valid
+    CHECK (
+      suggested_price_low_cents IS NULL
+      OR suggested_price_high_cents IS NULL
+      OR suggested_price_high_cents >= suggested_price_low_cents
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_products_status ON products (status);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products (category);
+CREATE INDEX IF NOT EXISTS idx_products_price_cents ON products (price_cents);
 
 CREATE TABLE IF NOT EXISTS product_images (
   id BIGSERIAL PRIMARY KEY,

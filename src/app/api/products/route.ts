@@ -2,14 +2,23 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 import { AdminAuthError, requireAdmin } from "@/lib/auth/admin";
-import { createProduct, listActiveProducts } from "@/lib/products/repository";
-import { parseCreateProductBody, ValidationError } from "@/lib/products/validation";
+import { createProduct, listActiveProductsWithFilters } from "@/lib/products/repository";
+import {
+  parseCreateProductBody,
+  parseProductListFilters,
+  ValidationError,
+} from "@/lib/products/validation";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const products = await listActiveProducts();
+    const filters = parseProductListFilters(new URL(request.url).searchParams);
+    const products = await listActiveProductsWithFilters(filters);
     return NextResponse.json({ products });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     console.error("GET /api/products failed", error);
     return NextResponse.json(
       { error: "Internal server error" },
