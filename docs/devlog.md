@@ -164,3 +164,56 @@ Inventory list with Draft/Ready/Listed/Sold statuses
 Generate “listing package” (copy/paste text + export photos) for Etsy/marketplaces
 
 Payments/checkout/storefront moved to Phase 3 once inventory workflow is stable.
+
+
+## Feb 28 — Dev Environment Break: Next.js Crash on Node 22 (Fixed by Pinning Node 20)
+
+# What happened:
+Both my machine and my dad’s machine failed to start the app after cloning/running:
+
+bash
+npm run dev
+Next.js crashed immediately with:
+
+TypeError: ... isStableBuild is not a function
+Node version was v22.18.0
+This was not an app-code bug; it was a runtime/tooling mismatch.
+
+# Root cause
+The repo is on Next.js 16.1.6
+Running it with Node 22 caused a Next internal startup crash
+Fresh GitHub clones were especially likely to hit this because Node versions vary per machine
+
+# Fix (repo hardening so others don’t break)
+Implemented guardrails so the repo runs predictably after cloning:
+
+Pinned Node LTS in package.json:
+"engines": { "node": "20.x" }
+Added .nvmrc:
+20
+Added .npmrc:
+engine-strict=true
+This forces npm install to fail fast on the wrong Node version instead of crashing in Next at runtime.
+Added .env.example (commit-safe template) and updated .gitignore so it can be committed:
+.gitignore still ignores .env.local and other secret env files
+explicitly allows !.env.example
+
+# Steps to run on a new machine (for dad)
+
+Install/load nvm (Homebrew install requires adding to ~/.zshrc)
+In the repo:
+nvm install 20
+nvm use 20
+rm -rf node_modules .next
+npm install
+npm run dev
+Create .env.local from .env.example and fill in required env vars:
+DATABASE_URL
+APP_LOGIN_PASSWORD
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+Outcome
+Repo now enforces a stable Node version (20.x)
+Fresh clones no longer “mysteriously” crash on startup due to Node 22
+Environment setup is documented via .env.example
+Status
