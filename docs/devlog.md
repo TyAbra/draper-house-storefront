@@ -217,3 +217,43 @@ Repo now enforces a stable Node version (20.x)
 Fresh clones no longer “mysteriously” crash on startup due to Node 22
 Environment setup is documented via .env.example
 Status
+
+
+## Mar 4 — Add Item Flow Fixed (Product ID Parsing) + Image Attach Working
+
+# What happened
+The /admin/items/new “Add Item” form failed after saving with:
+
+Item created but response was missing product id
+
+This blocked the image upload + attach pipeline.
+
+# Root cause
+The admin server action expected the create-product API response to return:
+
+product.id as a JavaScript number
+
+In practice, id could come back in a non-number form (string/bigint-like), causing the server action to treat it as missing even though the product was created.
+
+# Fix
+Updated product id parsing in the admin server action to accept:
+
+number
+string (e.g. "474")
+bigint
+
+This allowed the action to proceed to:
+
+Upload images via /api/admin/uploads/images
+Attach images via /api/products/:id/images
+
+# Verified working
+Save Draft / Save Ready now returns:
+
+Item saved. Open item detail
+
+Inventory feed shows the uploaded image on the item card.
+
+# Dev UX
+Hydration mismatch overlay appeared in dev due to extra attributes injected into the DOM.
+Added suppressHydrationWarning on the root <html> element in app layout to reduce noisy dev overlays.

@@ -108,7 +108,22 @@ function parseProductId(value: unknown): number | null {
   }
 
   const maybeId = (value as { id?: unknown }).id;
-  return typeof maybeId === "number" ? maybeId : null;
+
+  if (typeof maybeId === "number") {
+    return Number.isFinite(maybeId) && Number.isInteger(maybeId) && maybeId > 0 ? maybeId : null;
+  }
+
+  if (typeof maybeId === "string") {
+    const parsed = Number.parseInt(maybeId, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  if (typeof maybeId === "bigint") {
+    const asNumber = Number(maybeId);
+    return Number.isSafeInteger(asNumber) && asNumber > 0 ? asNumber : null;
+  }
+
+  return null;
 }
 
 async function callAdminApi(path: string, init: RequestInit = {}): Promise<Response> {
