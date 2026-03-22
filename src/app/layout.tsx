@@ -29,10 +29,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning on <html> is intentional and scoped to this element only —
+    // browser extensions (e.g. password managers, 1Password, Grammarly) inject attributes
+    // like class/data-* onto <html> after hydration, which React would otherwise flag as
+    // a mismatch. It does NOT suppress warnings inside the app tree.
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
-      >
+      {/* suppressHydrationWarning needed because Grammarly injects data-gr-* attributes on <body> */}
+      <body suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}>
         {children}
       </body>
     </html>
