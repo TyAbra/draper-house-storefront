@@ -1,18 +1,74 @@
-export type ProductStatus = "DRAFT" | "ACTIVE" | "SOLD";
+export type ProductStatus = "DRAFT" | "READY" | "ACTIVE" | "SOLD";
 
 export type CreateProductInput = {
+  // Identity
   name: string;
-  description: string | null;
-  priceCents: number;
-  quantity: 0 | 1;
-  status: ProductStatus;
   sku: string | null;
   category: string | null;
+  // Descriptions
+  description: string | null;        // Full Product Description (for listing)
+  itemDescription: string | null;    // Item Description (internal notes)
+  // Condition
   conditionNote: string | null;
+  // Physical
   dimensions: string | null;
-  weightLbs: number | null;
+  measurements: string | null;
+  // Acquisition
+  yearOfPurchase: string | null;
+  purchaseDate: string | null;
+  storeSource: string | null;
+  receiptPhotoLink: string | null;
+  receiptDocumentation: string | null;
+  // Pricing / financials
+  cogCents: number | null;
   suggestedPriceLowCents: number | null;
   suggestedPriceHighCents: number | null;
+  priceCents: number;
+  finalSalesPriceCents: number | null;
+  shippingCents: number | null;
+  taxesCents: number | null;
+  // Media / logistics
+  imageLink: string | null;
+  sellSiteLocation: string | null;
+  shipDate: string | null;
+  // Lifecycle
+  status: ProductStatus;
+  quantity: 0 | 1;
+  weightLbs: number | null;
+};
+
+export type UpdateProductInput = {
+  // Identity
+  name?: string;
+  sku?: string | null;
+  category?: string | null;
+  // Descriptions
+  description?: string | null;
+  itemDescription?: string | null;
+  // Condition
+  conditionNote?: string | null;
+  // Physical
+  dimensions?: string | null;
+  measurements?: string | null;
+  // Acquisition
+  yearOfPurchase?: string | null;
+  purchaseDate?: string | null;
+  storeSource?: string | null;
+  receiptPhotoLink?: string | null;
+  receiptDocumentation?: string | null;
+  // Pricing / financials
+  cogCents?: number | null;
+  suggestedPriceLowCents?: number | null;
+  suggestedPriceHighCents?: number | null;
+  priceCents?: number;
+  finalSalesPriceCents?: number | null;
+  shippingCents?: number | null;
+  taxesCents?: number | null;
+  // Media / logistics
+  imageLink?: string | null;
+  sellSiteLocation?: string | null;
+  shipDate?: string | null;
+  weightLbs?: number | null;
 };
 
 export type AddProductImageInput = {
@@ -26,7 +82,7 @@ export type ProductListFilters = {
   query: string | null;
   category: string | null;
   sort: ProductListSort;
-  limit: number;
+  limit: number | null; // null = no LIMIT (admin full-fetch)
 };
 
 export type CheckoutInput = {
@@ -123,16 +179,33 @@ function parseStatus(value: unknown): ProductStatus {
     return "DRAFT";
   }
 
-  if (value === "DRAFT" || value === "ACTIVE" || value === "SOLD") {
+  if (value === "DRAFT" || value === "READY" || value === "ACTIVE" || value === "SOLD") {
     return value;
   }
 
-  throw new ValidationError("status must be one of: DRAFT, ACTIVE, SOLD");
+  throw new ValidationError("status must be one of: DRAFT, READY, ACTIVE, SOLD");
 }
 
-function parseLimit(value: string | null): number {
+function parseOptionalDate(value: unknown, field: string): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new ValidationError(`${field} must be a date string`);
+  }
+
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new ValidationError(`${field} must be in YYYY-MM-DD format`);
+  }
+
+  return trimmed;
+}
+
+function parseLimit(value: string | null): number | null {
   if (!value) {
-    return 24;
+    return 24; // storefront default; admin overrides to null before calling listAllProductsForAdmin
   }
 
   const limit = Number.parseInt(value, 10);
@@ -219,23 +292,83 @@ export function parseCreateProductBody(body: unknown): CreateProductInput {
     suggestedPriceHighCents !== null &&
     suggestedPriceHighCents < suggestedPriceLowCents
   ) {
-    throw new ValidationError("suggestedPriceHigh must be greater than or equal to suggestedPriceLow");
+    throw new ValidationError(
+      "suggestedPriceHigh must be greater than or equal to suggestedPriceLow",
+    );
   }
 
   return {
     name: parseNonEmptyString(payload.name, "name"),
-    description: parseOptionalString(payload.description, "description"),
-    priceCents: parsePriceToCents(payload.price, "price"),
-    quantity,
-    status,
     sku: parseOptionalString(payload.sku, "sku"),
     category: parseOptionalString(payload.category, "category"),
+    description: parseOptionalString(payload.description, "description"),
+    itemDescription: parseOptionalString(payload.itemDescription, "itemDescription"),
     conditionNote: parseOptionalString(payload.conditionNote, "conditionNote"),
     dimensions: parseOptionalString(payload.dimensions, "dimensions"),
-    weightLbs: parseOptionalPositiveNumber(payload.weightLbs, "weightLbs"),
+    measurements: parseOptionalString(payload.measurements, "measurements"),
+    yearOfPurchase: parseOptionalString(payload.yearOfPurchase, "yearOfPurchase"),
+    purchaseDate: parseOptionalDate(payload.purchaseDate, "purchaseDate"),
+    storeSource: parseOptionalString(payload.storeSource, "storeSource"),
+    receiptPhotoLink: parseOptionalString(payload.receiptPhotoLink, "receiptPhotoLink"),
+    receiptDocumentation: parseOptionalString(payload.receiptDocumentation, "receiptDocumentation"),
+    cogCents: parseOptionalPriceToCents(payload.cog, "cog"),
     suggestedPriceLowCents,
     suggestedPriceHighCents,
+    priceCents: parsePriceToCents(payload.price, "price"),
+    finalSalesPriceCents: parseOptionalPriceToCents(payload.finalSalesPrice, "finalSalesPrice"),
+    shippingCents: parseOptionalPriceToCents(payload.shipping, "shipping"),
+    taxesCents: parseOptionalPriceToCents(payload.taxes, "taxes"),
+    imageLink: parseOptionalString(payload.imageLink, "imageLink"),
+    sellSiteLocation: parseOptionalString(payload.sellSiteLocation, "sellSiteLocation"),
+    shipDate: parseOptionalDate(payload.shipDate, "shipDate"),
+    status,
+    quantity,
+    weightLbs: parseOptionalPositiveNumber(payload.weightLbs, "weightLbs"),
   };
+}
+
+export function parseUpdateProductBody(body: unknown): UpdateProductInput {
+  if (typeof body !== "object" || body === null) {
+    throw new ValidationError("request body must be an object");
+  }
+
+  const payload = body as Record<string, unknown>;
+  const result: UpdateProductInput = {};
+
+  if (payload.name !== undefined) result.name = parseNonEmptyString(payload.name, "name");
+  if (payload.sku !== undefined) result.sku = parseOptionalString(payload.sku, "sku");
+  if (payload.category !== undefined) result.category = parseOptionalString(payload.category, "category");
+  if (payload.description !== undefined) result.description = parseOptionalString(payload.description, "description");
+  if (payload.itemDescription !== undefined) result.itemDescription = parseOptionalString(payload.itemDescription, "itemDescription");
+  if (payload.conditionNote !== undefined) result.conditionNote = parseOptionalString(payload.conditionNote, "conditionNote");
+  if (payload.dimensions !== undefined) result.dimensions = parseOptionalString(payload.dimensions, "dimensions");
+  if (payload.measurements !== undefined) result.measurements = parseOptionalString(payload.measurements, "measurements");
+  if (payload.yearOfPurchase !== undefined) result.yearOfPurchase = parseOptionalString(payload.yearOfPurchase, "yearOfPurchase");
+  if (payload.purchaseDate !== undefined) result.purchaseDate = parseOptionalDate(payload.purchaseDate, "purchaseDate");
+  if (payload.storeSource !== undefined) result.storeSource = parseOptionalString(payload.storeSource, "storeSource");
+  if (payload.receiptPhotoLink !== undefined) result.receiptPhotoLink = parseOptionalString(payload.receiptPhotoLink, "receiptPhotoLink");
+  if (payload.receiptDocumentation !== undefined) result.receiptDocumentation = parseOptionalString(payload.receiptDocumentation, "receiptDocumentation");
+  if (payload.cog !== undefined) result.cogCents = parseOptionalPriceToCents(payload.cog, "cog");
+  if (payload.suggestedPriceLow !== undefined) result.suggestedPriceLowCents = parseOptionalPriceToCents(payload.suggestedPriceLow, "suggestedPriceLow");
+  if (payload.suggestedPriceHigh !== undefined) result.suggestedPriceHighCents = parseOptionalPriceToCents(payload.suggestedPriceHigh, "suggestedPriceHigh");
+  if (payload.price !== undefined) result.priceCents = parsePriceToCents(payload.price, "price");
+  if (payload.finalSalesPrice !== undefined) result.finalSalesPriceCents = parseOptionalPriceToCents(payload.finalSalesPrice, "finalSalesPrice");
+  if (payload.shipping !== undefined) result.shippingCents = parseOptionalPriceToCents(payload.shipping, "shipping");
+  if (payload.taxes !== undefined) result.taxesCents = parseOptionalPriceToCents(payload.taxes, "taxes");
+  if (payload.imageLink !== undefined) result.imageLink = parseOptionalString(payload.imageLink, "imageLink");
+  if (payload.sellSiteLocation !== undefined) result.sellSiteLocation = parseOptionalString(payload.sellSiteLocation, "sellSiteLocation");
+  if (payload.shipDate !== undefined) result.shipDate = parseOptionalDate(payload.shipDate, "shipDate");
+  if (payload.weightLbs !== undefined) result.weightLbs = parseOptionalPositiveNumber(payload.weightLbs, "weightLbs");
+
+  const low = result.suggestedPriceLowCents;
+  const high = result.suggestedPriceHighCents;
+  if (low !== undefined && high !== undefined && low !== null && high !== null && high < low) {
+    throw new ValidationError(
+      "suggestedPriceHigh must be greater than or equal to suggestedPriceLow",
+    );
+  }
+
+  return result;
 }
 
 export function parseAddProductImageBody(body: unknown): AddProductImageInput {

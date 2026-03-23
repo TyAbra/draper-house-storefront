@@ -1,4 +1,6 @@
 -- Current schema snapshot for Draper House storefront.
+-- This file reflects the live schema after all migrations.
+-- To apply to a fresh DB: psql $DATABASE_URL -f db/schema.sql
 
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
@@ -14,14 +16,21 @@ CREATE TABLE IF NOT EXISTS products (
   suggested_price_low_cents INTEGER,
   suggested_price_high_cents INTEGER,
   currency CHAR(3) NOT NULL DEFAULT 'USD',
+  -- 1 = in stock, 0 = sold/unavailable
   inventory_quantity SMALLINT NOT NULL DEFAULT 1 CHECK (inventory_quantity IN (0, 1)),
-  status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'ACTIVE', 'SOLD')),
+  -- DRAFT  = saved, no photos yet
+  -- READY  = photos attached, ready to list
+  -- ACTIVE = listed on marketplace
+  -- SOLD   = sold
+  status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'READY', 'ACTIVE', 'SOLD')),
   published_at TIMESTAMPTZ,
   sold_at TIMESTAMPTZ,
+  -- Date the item was shipped after sale
+  ship_date DATE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT products_inventory_status_consistent CHECK (
-    (status = 'DRAFT' AND inventory_quantity = 1 AND published_at IS NULL AND sold_at IS NULL)
+    (status IN ('DRAFT', 'READY') AND inventory_quantity = 1 AND published_at IS NULL AND sold_at IS NULL)
     OR
     (status = 'ACTIVE' AND inventory_quantity = 1 AND published_at IS NOT NULL AND sold_at IS NULL)
     OR
@@ -88,10 +97,6 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity SMALLINT NOT NULL DEFAULT 1 CHECK (quantity = 1),
   unit_price_cents INTEGER NOT NULL CHECK (unit_price_cents >= 0),
   currency CHAR(3) NOT NULL DEFAULT 'USD',
-  -- Denormalized payment state for DB-level oversell protection.
-  -- We cannot directly index on parent orders.status in a partial unique index,
-  -- so webhook/order-finalization logic must set this to true atomically when the
-  -- order becomes PAID.
   paid BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -101,7 +106,7 @@ CREATE TABLE IF NOT EXISTS order_items (
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items (order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items (product_id);
 
--- Oversell protection: at most one paid order item per product across all orders.
+-- Oversell protection: at most one paid order item per product.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_order_items_one_paid_per_product
   ON order_items (product_id)
   WHERE paid = TRUE;

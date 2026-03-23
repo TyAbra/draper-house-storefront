@@ -1,7 +1,26 @@
+import { timingSafeEqual } from "crypto";
+
 export class AdminAuthError extends Error {
   constructor() {
     super("Unauthorized");
     this.name = "AdminAuthError";
+  }
+}
+
+/**
+ * Constant-time token comparison to prevent timing-based token discovery.
+ */
+function safeTokenEquals(provided: string, expected: string): boolean {
+  try {
+    const a = Buffer.from(provided, "utf8");
+    const b = Buffer.from(expected, "utf8");
+    if (a.length !== b.length) {
+      timingSafeEqual(a, a); // keep timing consistent
+      return false;
+    }
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
   }
 }
 
@@ -13,9 +32,12 @@ export function requireAdmin(request: Request): void {
     throw new AdminAuthError();
   }
 
-  const [scheme, token] = authHeader.split(" ");
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer" || !parts[1]) {
+    throw new AdminAuthError();
+  }
 
-  if (scheme !== "Bearer" || !token || token !== expectedToken) {
+  if (!safeTokenEquals(parts[1], expectedToken)) {
     throw new AdminAuthError();
   }
 }

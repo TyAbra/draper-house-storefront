@@ -1,8 +1,8 @@
 import AdminClient from "@/app/admin/admin-client";
-import { listAdminProductsAction } from "@/app/admin/actions";
+import { listAllAdminProductsAction } from "@/app/admin/actions";
 
 export default async function AdminPage() {
-  const result = await listAdminProductsAction();
+  const result = await listAllAdminProductsAction();
 
   return (
     <AdminClient

@@ -19,9 +19,19 @@ export default async function AdminItemDetailPage({ params }: PageProps) {
 
   const result = await getAdminProductDetailAction(productId);
 
+  if (result.error || !result.product) {
+    return (
+      <main className="mx-auto max-w-xl px-4 py-5">
+        <p className="rounded-2xl bg-[rgba(195,107,78,0.16)] px-4 py-3 text-base text-[var(--dh-terracotta)]">
+          {result.error ?? "Item not found."}
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-xl px-4 py-5">
-      <ItemDetailClient productId={productId} initialProduct={result.product} initialError={result.error} />
+      <ItemDetailClient initialProduct={result.product} />
     </main>
   );
 }

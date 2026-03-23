@@ -5,8 +5,9 @@ import path from "path";
 import { NextResponse } from "next/server";
 
 import { AdminAuthError, requireAdmin } from "@/lib/auth/admin";
+import { isS3Configured, uploadImageToS3 } from "@/lib/storage/s3";
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 const MIME_EXTENSION: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -54,18 +55,32 @@ export async function POST(request: Request) {
     const baseName = sanitizeName(entry.name.replace(/\.[^.]+$/, "")) || "photo";
     const fileName = `${Date.now()}-${baseName}-${randomUUID()}.${extension}`;
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
-
     const bytes = Buffer.from(await entry.arrayBuffer());
-    await writeFile(path.join(uploadsDir, fileName), bytes);
 
-    return NextResponse.json(
-      {
-        imageUrl: `/uploads/${fileName}`,
-      },
-      { status: 201 },
-    );
+    let imageUrl: string;
+
+    if (isS3Configured()) {
+      // ── S3 upload ──────────────────────────────────────────────────────────
+      const result = await uploadImageToS3(bytes, fileName, mimeType);
+
+      if (!result.success) {
+        console.error("S3 upload failed:", result.error);
+        return NextResponse.json({ error: "Image upload failed" }, { status: 500 });
+      }
+
+      imageUrl = result.imageUrl;
+    } else {
+      // ── Local filesystem fallback (dev only) ───────────────────────────────
+      // WARNING: local uploads do NOT persist across Vercel deployments.
+      // Set AWS_S3_BUCKET, AWS_S3_REGION, AWS_ACCESS_KEY_ID, and
+      // AWS_SECRET_ACCESS_KEY to enable S3 in production.
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      await mkdir(uploadsDir, { recursive: true });
+      await writeFile(path.join(uploadsDir, fileName), bytes);
+      imageUrl = `/uploads/${fileName}`;
+    }
+
+    return NextResponse.json({ imageUrl }, { status: 201 });
   } catch (error) {
     if (error instanceof AdminAuthError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
