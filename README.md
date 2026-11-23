@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Draper House: inventory and storefront app
 
-## Getting Started
+An inventory and storefront app for Draper House, a small family antique and vintage business.
 
-First, run the development server:
+## The problem
+
+Each item is one of a kind. Items were tracked by hand, so it was hard to know what was in stock, what was ready to list, and how long things had been sitting. The plan was an online store, but the store depends on clean inventory data, so inventory came first.
+
+## What it does today
+
+- **Mobile-first item capture:** photograph an item on a phone, add details, save. Built around how the owner actually works.
+- **Admin inventory:** list and detail views, edit items, mark items "ready" to sell, days-in-inventory tracking, 14 fixed antique and vintage categories so the data stays consistent.
+- **Storefront groundwork:** products, orders and a Stripe webhook ledger are in the schema. Checkout is the next phase.
+
+## Stack
+
+Next.js (App Router, TypeScript) · PostgreSQL · S3 for images · Stripe hosted checkout (planned)
+
+## Security choices
+
+- Payments go through Stripe hosted checkout only. The server never sees card data.
+- Stripe webhook signature checks and an idempotency ledger, so an order is never created twice.
+- Admin-only routes, HMAC-signed session cookies, input validation on every API route.
+- All secrets come from environment variables. See `.env.example`.
+
+## Running it locally
 
 ```bash
+cp .env.example .env.local   # fill in values
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Database schema: `db/schema.sql` and `db/migrations/`. Build notes: `docs/devlog.md`.
